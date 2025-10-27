@@ -441,7 +441,6 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ## Support
 
 - Issues: [GitHub Issues](https://github.com/Chukwuebuka-2003/buildpost/issues)
-- Documentation: [Full Docs](https://buildpost.dev/docs)
 - Twitter: [@ebukagaus](https://x.com/ebukagaus)
 
 ## Acknowledgments
