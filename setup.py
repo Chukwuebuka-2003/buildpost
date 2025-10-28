@@ -7,7 +7,7 @@ setup(
     name="buildpost",
     version="0.1.1",
     author="BuildPost Team",
-    author_email="hello@buildpost.dev",
+    author_email="ebulamicheal@gmail.com",
     description="Turn your git commits into social media posts using AI",
     long_description=long_description,
     long_description_content_type="text/markdown",
