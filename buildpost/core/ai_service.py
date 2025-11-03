@@ -18,11 +18,17 @@ class AIService:
             "env_var": "GROQ_API_KEY",
             "signup_url": "https://console.groq.com/keys",
         },
+        "openrouter": {
+            "display_name": "OpenRouter",
+            "env_var": "OPENROUTER_API_KEY",
+            "signup_url": "https://openrouter.ai/settings/keys",
+        }
     }
 
     DEFAULT_MODELS: Dict[str, str] = {
         "openai": "gpt-4o-mini",
         "groq": "qwen/qwen3-32b",
+        "openrouter": "openai/gpt-4o-mini"
     }
 
     def __init__(
@@ -79,6 +85,13 @@ class AIService:
             from groq import Groq
 
             self.client = Groq(api_key=self.api_key)
+        elif provider == "openrouter":
+            from openai import OpenAI
+
+            self.client = OpenAI(
+                base_url="https://openrouter.ai/api/v1",
+                api_key=self.api_key
+            )
 
     def generate_post(
         self,
@@ -106,8 +119,12 @@ class AIService:
             return self._generate_with_openai(
                 system_prompt, user_prompt, max_tokens, temperature
             )
-        if self.provider == "groq":
+        elif self.provider == "groq":
             return self._generate_with_groq(
+                system_prompt, user_prompt, max_tokens, temperature
+            )
+        elif self.provider == "openrouter":
+            return self._generate_with_openrouter(
                 system_prompt, user_prompt, max_tokens, temperature
             )
 
@@ -179,6 +196,42 @@ class AIService:
             raise Exception("No text generated.")
         except Exception as exc:
             raise Exception(f"Failed to generate post: {str(exc)}")
+        
+    def _generate_with_openrouter(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        max_tokens: int,
+        temperature: float,
+    ) -> str:
+        """Generate content using OpenRouter chat completions."""
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
+            choices = getattr(response, "choices", [])
+            if not choices:
+                raise Exception("No text generated.")
+
+            message = choices[0].message
+            content = getattr(message, "content", None)
+            if isinstance(content, str):
+                return content.strip()
+            if isinstance(content, list):
+                parts = [
+                    part.get("text", "") for part in content if isinstance(part, dict)
+                ]
+                return " ".join(parts).strip()
+
+            raise Exception("No text generated.")
+        except Exception as exc:
+            raise Exception(f"Failed to generate post: {str(exc)}")
 
     def test_connection(self) -> bool:
         """
@@ -220,8 +273,10 @@ class AIService:
         provider = provider or "openai"
         if provider == "openai":
             return api_key.startswith("sk-")
-        if provider == "groq":
+        elif provider == "groq":
             return api_key.startswith("gsk_") or api_key.startswith("sk-")
+        elif provider == "openrouter":
+            return api_key.startswith("sk-or-v1-")
         return True
 
     @classmethod

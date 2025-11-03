@@ -14,10 +14,12 @@ class Config:
     DEFAULT_MODELS = {
         "openai": "gpt-4o-mini",
         "groq": "qwen/qwen3-32b",
+        "openrouter": "openai/gpt-4o-mini"
     }
     PROVIDER_ENV_VARS = {
         "openai": "OPENAI_API_KEY",
         "groq": "GROQ_API_KEY",
+        "openrouter": "OPENROUTER_API_KEY"
     }
 
     def __init__(self):
