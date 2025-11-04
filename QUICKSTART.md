@@ -118,11 +118,7 @@ What caching strategies have worked well in your projects?
 ```bash
 buildpost config set-key YOUR_API_KEY
 # or set an environment variable:
-<<<<<<< HEAD
-# export OPENAI_API_KEY=... or GROQ_API_KEY=...
-=======
 # export OPENAI_API_KEY=... or GROQ_API_KEY=... or OPENROUTER_API_KEY=...
->>>>>>> 66d8d3bb903ce35015a5b91a7bd39ebb8407fcce
 ```
 
 **Not a git repository error?**

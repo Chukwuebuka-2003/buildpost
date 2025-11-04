@@ -28,10 +28,7 @@ class AIService:
     DEFAULT_MODELS: Dict[str, str] = {
         "openai": "gpt-4o-mini",
         "groq": "qwen/qwen3-32b",
-<<<<<<< HEAD
-=======
         "openrouter": "openai/gpt-4o-mini"
->>>>>>> 66d8d3bb903ce35015a5b91a7bd39ebb8407fcce
     }
 
     def __init__(
@@ -88,8 +85,6 @@ class AIService:
             from groq import Groq
 
             self.client = Groq(api_key=self.api_key)
-<<<<<<< HEAD
-=======
         elif provider == "openrouter":
             from openai import OpenAI
 
@@ -97,7 +92,6 @@ class AIService:
                 base_url="https://openrouter.ai/api/v1",
                 api_key=self.api_key
             )
->>>>>>> 66d8d3bb903ce35015a5b91a7bd39ebb8407fcce
 
     def generate_post(
         self,
@@ -125,12 +119,6 @@ class AIService:
             return self._generate_with_openai(
                 system_prompt, user_prompt, max_tokens, temperature
             )
-<<<<<<< HEAD
-        if self.provider == "groq":
-            return self._generate_with_groq(
-                system_prompt, user_prompt, max_tokens, temperature
-            )
-=======
         elif self.provider == "groq":
             return self._generate_with_groq(
                 system_prompt, user_prompt, max_tokens, temperature
@@ -139,7 +127,6 @@ class AIService:
             return self._generate_with_openrouter(
                 system_prompt, user_prompt, max_tokens, temperature
             )
->>>>>>> 66d8d3bb903ce35015a5b91a7bd39ebb8407fcce
 
         raise Exception(f"Unsupported provider '{self.provider}'.")
 
@@ -209,8 +196,6 @@ class AIService:
             raise Exception("No text generated.")
         except Exception as exc:
             raise Exception(f"Failed to generate post: {str(exc)}")
-<<<<<<< HEAD
-=======
         
     def _generate_with_openrouter(
         self,
@@ -247,7 +232,6 @@ class AIService:
             raise Exception("No text generated.")
         except Exception as exc:
             raise Exception(f"Failed to generate post: {str(exc)}")
->>>>>>> 66d8d3bb903ce35015a5b91a7bd39ebb8407fcce
 
     def test_connection(self) -> bool:
         """
@@ -289,15 +273,10 @@ class AIService:
         provider = provider or "openai"
         if provider == "openai":
             return api_key.startswith("sk-")
-<<<<<<< HEAD
-        if provider == "groq":
-            return api_key.startswith("gsk_") or api_key.startswith("sk-")
-=======
         elif provider == "groq":
             return api_key.startswith("gsk_") or api_key.startswith("sk-")
         elif provider == "openrouter":
             return api_key.startswith("sk-or-v1-")
->>>>>>> 66d8d3bb903ce35015a5b91a7bd39ebb8407fcce
         return True
 
     @classmethod
