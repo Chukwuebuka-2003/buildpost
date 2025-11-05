@@ -7,14 +7,14 @@ setup(
     name="buildpost",
     version="0.1.1",
     author="BuildPost Team",
-    author_email="hello@buildpost.dev",
+    author_email="ebulamicheal@gmail.com",
     description="Turn your git commits into social media posts using AI",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/Chukwuebuka-2003/buildpost",
+    url="https://github.com/sharonibejih/buildpost",
     project_urls={
-        "Bug Reports": "https://github.com/Chukwuebuka-2003/buildpost/issues",
-        "Source": "https://github.com/Chukwuebuka-2003/buildpost",
+        "Bug Reports": "https://github.com/sharonibejih/buildpost/issues",
+        "Source": "https://github.com/sharonibejih/buildpost",
     },
     packages=find_packages(),
     classifiers=[

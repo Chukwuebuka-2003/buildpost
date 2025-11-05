@@ -6,7 +6,7 @@ Free CLI tool that transforms your git commits into social media content. Perfec
 
 ## Features
 
-- **AI-Powered**: Works with OpenAI, Groq, or Claude (Anthropic) LLMs
+- **AI-Powered**: Works with OpenAI, Groq, or OpenRouter or Claude (Anthropic) LLMs
 - **Multiple Styles**: Casual, professional, technical, learning-focused, and more
 - **Platform-Optimized**: Twitter, LinkedIn, Dev.to, and generic formats
 - **Commit Message Generation**: AI-powered commit messages from your changes with intelligent token management
@@ -28,11 +28,13 @@ pip install buildpost
    - `openai`: GPT-4o mini (default) or any compatible Chat Completions model
    - `groq`: Lightning-fast Qwen3 and Llama-family models
    - `claude`: Claude Sonnet 4.5 or other Anthropic models
+   - `openrouter`: GPT-4o mini (default) or any compatible Chat Completions model
 
 2. Grab an API key:
    - OpenAI: [OpenAI dashboard](https://platform.openai.com/api-keys)
    - Groq: [Groq console](https://console.groq.com/keys)
    - Claude: [Anthropic console](https://console.anthropic.com/)
+   - OpenRouter: [OpenRouter keys](https://openrouter.ai/settings/keys)
 
 3. Configure BuildPost:
 ```bash
@@ -47,7 +49,7 @@ buildpost config set-key --provider claude sk-ant-XXXX
 
 Prefer environment variables?
 ```bash
-export OPENAI_API_KEY=your_key    # or GROQ_API_KEY=... or ANTHROPIC_API_KEY=...
+export OPENAI_API_KEY=your_key    # or GROQ_API_KEY=... or ANTHROPIC_API_KEY=... or OPENROUTER_API_KEY=...
 ```
 
 ### Usage
@@ -392,6 +394,9 @@ buildpost config set-key --provider groq gsk-...    # Groq key
 
 buildpost config set-provider claude
 buildpost config set-key --provider claude sk-ant-...  # Claude key
+
+buildpost config set-provider openrouter
+buildpost config set-key --provider openrouter sk-or-v1-...    # OpenRouter key
 ```
 
 Environment variable names:
@@ -401,6 +406,7 @@ Environment variable names:
 | `openai` | `OPENAI_API_KEY`     | Works with GPT-4o mini, GPT-4o, GPT-3.5 |
 | `groq`   | `GROQ_API_KEY`       | Supports Qwen & Llama models |
 | `claude` | `ANTHROPIC_API_KEY`  | Supports Claude 4 and Claude 3.5 models |
+| `openrouter` | `OPENROUTER_API_KEY` | Supports GPT-4o mini, Llama, Grok models |
 
 Set it before running BuildPost:
 ```bash
@@ -461,6 +467,7 @@ Each provider enforces its own rate/usage limits. If you hit them:
 - OpenAI: check account limits or switch to a lighter model (gpt-4o-mini, gpt-3.5)
 - Groq: review quota in the Groq console or pick a smaller model
 - Claude: check your Anthropic console for usage limits
+- OpenRouter: check credits available and usage limits for the API key
 - Reduce how frequently you generate posts
 
 ## Contributing
@@ -504,6 +511,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ## Acknowledgments
 
 - LLM support provided by [OpenAI](https://openai.com/), [Groq](https://groq.com/), and [Anthropic](https://anthropic.com/)
+- LLM support provided by [OpenAI](https://openai.com/) and [Groq](https://groq.com/) and [OpenRouter](https://openrouter.ai)
 - Powered by [GitPython](https://gitpython.readthedocs.io/)
 - CLI built with [Click](https://click.palletsprojects.com/)
 - Token counting by [tiktoken](https://github.com/openai/tiktoken)
