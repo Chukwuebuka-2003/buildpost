@@ -18,6 +18,11 @@ class AIService:
             "env_var": "GROQ_API_KEY",
             "signup_url": "https://console.groq.com/keys",
         },
+        "claude": {
+            "display_name": "Claude (Anthropic)",
+            "env_var": "ANTHROPIC_API_KEY",
+            "signup_url": "https://console.anthropic.com/",
+        },
         "openrouter": {
             "display_name": "OpenRouter",
             "env_var": "OPENROUTER_API_KEY",
@@ -28,10 +33,8 @@ class AIService:
     DEFAULT_MODELS: Dict[str, str] = {
         "openai": "gpt-4o-mini",
         "groq": "qwen/qwen3-32b",
-<<<<<<< HEAD
-=======
+        "claude": "claude-sonnet-4-5",
         "openrouter": "openai/gpt-4o-mini"
->>>>>>> 66d8d3bb903ce35015a5b91a7bd39ebb8407fcce
     }
 
     def __init__(
@@ -44,7 +47,7 @@ class AIService:
         Initialize AI service for the selected provider.
 
         Args:
-            provider: LLM provider identifier ('openai', 'groq')
+            provider: LLM provider identifier ('openai', 'groq', 'claude')
             api_key: API key for the provider. Falls back to provider env var.
             model: Model name to use. Falls back to provider defaults.
 
@@ -88,8 +91,10 @@ class AIService:
             from groq import Groq
 
             self.client = Groq(api_key=self.api_key)
-<<<<<<< HEAD
-=======
+        elif provider == "claude":
+            from anthropic import Anthropic
+
+            self.client = Anthropic(api_key=self.api_key)
         elif provider == "openrouter":
             from openai import OpenAI
 
@@ -97,7 +102,6 @@ class AIService:
                 base_url="https://openrouter.ai/api/v1",
                 api_key=self.api_key
             )
->>>>>>> 66d8d3bb903ce35015a5b91a7bd39ebb8407fcce
 
     def generate_post(
         self,
@@ -121,27 +125,18 @@ class AIService:
         Raises:
             Exception: If generation fails
         """
-        if self.provider == "openai":
-            return self._generate_with_openai(
-                system_prompt, user_prompt, max_tokens, temperature
-            )
-<<<<<<< HEAD
-        if self.provider == "groq":
-            return self._generate_with_groq(
-                system_prompt, user_prompt, max_tokens, temperature
-            )
-=======
-        elif self.provider == "groq":
-            return self._generate_with_groq(
-                system_prompt, user_prompt, max_tokens, temperature
-            )
-        elif self.provider == "openrouter":
-            return self._generate_with_openrouter(
-                system_prompt, user_prompt, max_tokens, temperature
-            )
->>>>>>> 66d8d3bb903ce35015a5b91a7bd39ebb8407fcce
+        generators = {
+            "openai": self._generate_with_openai,
+            "groq": self._generate_with_groq,
+            "claude": self._generate_with_claude,
+            "openrouter": self._generate_with_openrouter,
+        }
 
-        raise Exception(f"Unsupported provider '{self.provider}'.")
+        generator = generators.get(self.provider)
+        if not generator:
+            raise Exception(f"Unsupported provider '{self.provider}'.")
+
+        return generator(system_prompt, user_prompt, max_tokens, temperature)
 
     def _generate_with_openai(
         self,
@@ -209,8 +204,6 @@ class AIService:
             raise Exception("No text generated.")
         except Exception as exc:
             raise Exception(f"Failed to generate post: {str(exc)}")
-<<<<<<< HEAD
-=======
         
     def _generate_with_openrouter(
         self,
@@ -247,8 +240,44 @@ class AIService:
             raise Exception("No text generated.")
         except Exception as exc:
             raise Exception(f"Failed to generate post: {str(exc)}")
->>>>>>> 66d8d3bb903ce35015a5b91a7bd39ebb8407fcce
 
+    def _generate_with_claude(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        max_tokens: int,
+        temperature: float,
+    ) -> str:
+        """Generate content using Claude (Anthropic) messages API."""
+        try:
+            response = self.client.messages.create(
+                model=self.model_name,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                system=system_prompt,
+                messages=[
+                    {"role": "user", "content": user_prompt}
+                ],
+            )
+            
+            if not response.content:
+                raise Exception("No text generated.")
+            
+            text_parts = []
+            for block in response.content:
+                if hasattr(block, 'text'):
+                    text_parts.append(block.text)
+                elif isinstance(block, dict) and 'text' in block:
+                    text_parts.append(block['text'])
+            
+            if not text_parts:
+                raise Exception("No text generated.")
+            
+            return " ".join(text_parts).strip()
+            
+        except Exception as exc:
+            raise Exception(f"Failed to generate post: {str(exc)}")
+            
     def test_connection(self) -> bool:
         """
         Test if API key is valid and service is accessible.
@@ -287,18 +316,14 @@ class AIService:
             return False
 
         provider = provider or "openai"
-        if provider == "openai":
-            return api_key.startswith("sk-")
-<<<<<<< HEAD
-        if provider == "groq":
-            return api_key.startswith("gsk_") or api_key.startswith("sk-")
-=======
-        elif provider == "groq":
-            return api_key.startswith("gsk_") or api_key.startswith("sk-")
-        elif provider == "openrouter":
-            return api_key.startswith("sk-or-v1-")
->>>>>>> 66d8d3bb903ce35015a5b91a7bd39ebb8407fcce
-        return True
+        key_prefixes = {
+            "openai": ["sk-"],
+            "groq": ["gsk_", "sk-"],
+            "claude": ["sk-"],
+            "openrouter": ["sk-or-v1-"],
+        }
+        prefixes = key_prefixes.get(provider, [])
+        return any(api_key.startswith(prefix) for prefix in prefixes)
 
     @classmethod
     def supported_providers(cls) -> List[str]:
