@@ -181,6 +181,31 @@ prompts:
       - Markdown formatting
       - Keep it under 350 words
 
+  daily_changelog:
+    name: "Daily Changelog"
+    description: "Summarize a single day of commits into a concise changelog."
+    system: |
+      You are a senior software engineer writing daily changelogs for a software project.
+      Your tone is brief, direct, and actionable. Focus on today's progress.
+
+    template: |
+      Create a daily changelog from the following commit data.
+
+      Date: {date_range}
+      Total Commits: {commit_count}
+      Unique Files Changed: {unique_files_count}
+      Total Line Changes: +{total_insertions}/-{total_deletions}
+
+      Commits:
+      {commits_list}
+
+      Write a concise changelog that includes:
+      - A 1-2 sentence summary of today's work
+      - 2-4 bullet highlights of the main changes
+      - Clear, direct language
+      - Markdown formatting
+      - Keep it under 150 words
+
   commit_conventional:
     name: "Conventional Commit"
     description: "Generate conventional commit messages (feat, fix, docs, etc.)"
