@@ -98,6 +98,9 @@ Generate a weekly changelog from recent commits:
 # Default: last 7 days from HEAD
 buildpost changelog
 
+# Daily changelog (last 1 day)
+buildpost changelog --daily
+
 # Look back 14 days
 buildpost changelog --days 14
 
@@ -401,6 +404,27 @@ buildpost platforms list     # List available platforms
 buildpost version            # Show version
 buildpost --help             # Show help
 ```
+
+## Interactive Commit Selector
+
+Use the interactive TUI to select commits and generate changelogs with a visual interface:
+
+```bash
+# Interactive commit selector
+buildpost select
+
+# Look back N days (default: 7)
+buildpost select --days 14
+```
+
+### Features
+- Arrow keys to navigate commit list
+- Space to toggle commit selection
+- Enter to generate preview
+- 'd' to set date filter
+- 's' to select style (daily/weekly)
+- 'p' to select platform
+- 'q' to quit
 
 ## Troubleshooting
 
