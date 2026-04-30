@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="buildpost",
-    version="0.1.3",
+    version="0.1.4",
     author="BuildPost Team",
     author_email="ebulamicheal@gmail.com",
     description="Turn your git commits into social media posts using AI",
