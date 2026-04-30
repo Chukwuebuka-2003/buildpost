@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="buildpost",
-    version="0.1.2",
+    version="0.1.3",
     author="BuildPost Team",
     author_email="ebulamicheal@gmail.com",
     description="Turn your git commits into social media posts using AI",
@@ -38,6 +38,8 @@ setup(
         "pyperclip>=1.8.0",
         "colorama>=0.4.6",
         "rich>=13.0.0",
+        "tiktoken>=0.12.0",
+        "readchar>=4.0.0",
     ],
     entry_points={
         "console_scripts": [

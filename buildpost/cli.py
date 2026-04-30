@@ -16,6 +16,7 @@ from buildpost.core.prompt_engine import PromptEngine
 from buildpost.utils.config import Config
 from buildpost.utils.formatters import format_post
 from buildpost.utils.token_resolver import TokenCounter
+from buildpost.ui.interactive import run_interactive
 
 console = Console()
 
@@ -409,8 +410,13 @@ def _build_changelog_context(commits, range_spec: str) -> dict:
     show_default=True,
     help="Number of days to look back when --since isn't set",
 )
-@click.option("--range", "-r", "rev_range", help="Git revision range (e.g., main..HEAD)")
-@click.option("--style", "-s", default="weekly_changelog", help="Prompt style to use")
+@click.option(
+    "--daily", "is_daily", is_flag=True, help="Generate a daily changelog (last 1 day)"
+)
+@click.option(
+    "--range", "-r", "rev_range", help="Git revision range (e.g., main..HEAD)"
+)
+@click.option("--style", "-s", help="Prompt style to use")
 @click.option("--output", "-o", type=click.Path(dir_okay=False), help="Write to a file")
 @click.option("--no-copy", is_flag=True, help="Do not copy to clipboard")
 @click.option("--api-key", help="LLM API key (overrides config)")
@@ -419,9 +425,29 @@ def _build_changelog_context(commits, range_spec: str) -> dict:
     type=click.Choice(AIService.supported_providers()),
     help="LLM provider to use (openai, groq, claude)",
 )
-@click.option("--max-tokens", type=int, default=None, help="Maximum tokens for the output")
-def changelog(since, until, days, rev_range, style, output, no_copy, api_key, provider, max_tokens):
-    """Generate a weekly changelog from recent commits."""
+@click.option(
+    "--max-tokens", type=int, default=None, help="Maximum tokens for the output"
+)
+def changelog(
+    since,
+    until,
+    days,
+    is_daily,
+    rev_range,
+    style,
+    output,
+    no_copy,
+    api_key,
+    provider,
+    max_tokens,
+):
+    """Generate a changelog from recent commits (daily, weekly, or custom)."""
+    if is_daily:
+        days = 1
+        style = "daily_changelog"
+
+    if not style:
+        style = "weekly_changelog"
     try:
         config = Config()
         ai_service, prompt_engine, _ = _setup_ai_services(api_key, provider, config)
@@ -449,32 +475,54 @@ def changelog(since, until, days, rev_range, style, output, no_copy, api_key, pr
             console.print(
                 f"[yellow]Prompt '{style}' not found. Using built-in changelog template.[/yellow]"
             )
-            fallback_system = (
-                "You are a senior software engineer who writes concise, "
-                "useful weekly changelogs for stakeholders and developers."
-            )
-            fallback_template = (
-                "Create a weekly changelog from the commits below.\n\n"
-                "Date Range: {date_range}\n"
-                "Range Spec: {range_spec}\n"
-                "Total Commits: {commit_count}\n"
-                "Unique Files: {unique_files_count}\n"
-                "Total Changes: +{total_insertions}/-{total_deletions}\n\n"
-                "Commits:\n{commits_list}\n\n"
-                "Write a changelog with:\n"
-                "- A short summary paragraph\n"
-                "- 3-6 bullet highlights grouped by theme\n"
-                "- A concise list of notable commits (if needed)\n"
-                "- Keep it under 350 words\n"
-                "- Use Markdown formatting\n"
-            )
+            if style == "daily_changelog":
+                fallback_system = (
+                    "You are a senior software engineer writing daily changelogs for a software project."
+                    "Your tone is brief, direct, and actionable. Focus on today's progress."
+                )
+                fallback_template = (
+                    "Create a daily changelog from the following commit data.\n\n"
+                    "Date: {date_range}\n"
+                    "Total Commits: {commit_count}\n"
+                    "Unique Files Changed: {unique_files_count}\n"
+                    "Total Line Changes: +{total_insertions}/-{total_deletions}\n\n"
+                    "Commits:\n{commits_list}\n\n"
+                    "Write a concise changelog that includes:\n"
+                    "- A 1-2 sentence summary of today's work\n"
+                    "- 2-4 bullet highlights of the main changes\n"
+                    "- Clear, direct language\n"
+                    "- Markdown formatting\n"
+                    "- Keep it under 150 words\n"
+                )
+            else:
+                fallback_system = (
+                    "You are a senior software engineer who writes concise, "
+                    "useful weekly changelogs for stakeholders and developers."
+                )
+                fallback_template = (
+                    "Create a weekly changelog from the following commit data.\n\n"
+                    "Date Range: {date_range}\n"
+                    "Range Spec: {range_spec}\n"
+                    "Total Commits: {commit_count}\n"
+                    "Unique Files: {unique_files_count}\n"
+                    "Total Changes: +{total_insertions}/-{total_deletions}\n\n"
+                    "Commits:\n{commits_list}\n\n"
+                    "Write a changelog with:\n"
+                    "- A short summary paragraph\n"
+                    "- 3-6 bullet highlights grouped by theme\n"
+                    "- A concise list of notable commits (if needed)\n"
+                    "- Keep it under 350 words\n"
+                    "- Use Markdown formatting\n"
+                )
             rendered_prompt = {
                 "system": fallback_system,
                 "user": fallback_template.format(**context),
-                "name": "weekly_changelog_fallback",
+                "name": f"{style}_fallback",
             }
 
-        with console.status("[bold green]Generating changelog with AI...", spinner="dots"):
+        with console.status(
+            "[bold green]Generating changelog with AI...", spinner="dots"
+        ):
             try:
                 generated = ai_service.generate_post(
                     system_prompt=rendered_prompt["system"],
@@ -487,10 +535,11 @@ def changelog(since, until, days, rev_range, style, output, no_copy, api_key, pr
                 sys.exit(1)
 
         console.print("\n" + "=" * 60)
+        title = "Daily Changelog" if is_daily else "Weekly Changelog"
         console.print(
             Panel(
                 Markdown(generated),
-                title=f"[bold green]Weekly Changelog[/bold green] ({style})",
+                title=f"[bold green]{title}[/bold green] ({style})",
                 border_style="green",
             )
         )
@@ -521,157 +570,187 @@ def changelog(since, until, days, rev_range, style, output, no_copy, api_key, pr
         sys.exit(1)
 
 
+@cli.command()
+@click.option("--days", type=int, default=7, show_default=True, help="Days to look back")
+def select(days):
+    """Interactive commit selector with TUI for changelog generation."""
+    config = Config()
+    run_interactive(config)
+
+
 def _clean_ai_output(raw_output: str) -> str:
     """Smart extraction of commit message from AI output with thinking process."""
     import re
-    
+
     if not raw_output:
         return ""
-    
+
     # Strategy 0: Look for commit message after specific phrases
     commit_indicators = [
-        r'(?:the commit message (?:would be|should be|is)|so the commit message would be|commit message:|message:)\s*:?\s*\n?\s*([^\n]+)',
-        r'(?:would be|should be|is):\s*\n?\s*([a-z]+(?:\([^)]+\))?:\s*[^\n]+)',
-        r'^([a-z]+(?:\([^)]+\))?:\s*[^\n]+)$',
+        r"(?:the commit message (?:would be|should be|is)|so the commit message would be|commit message:|message:)\s*:?\s*\n?\s*([^\n]+)",
+        r"(?:would be|should be|is):\s*\n?\s*([a-z]+(?:\([^)]+\))?:\s*[^\n]+)",
+        r"^([a-z]+(?:\([^)]+\))?:\s*[^\n]+)$",
     ]
 
     for pattern in commit_indicators:
         matches = re.findall(pattern, raw_output, re.MULTILINE | re.IGNORECASE)
         if matches:
             commit_msg = matches[0].strip()
-            if len(commit_msg) > 10 and ':' in commit_msg:
+            if len(commit_msg) > 10 and ":" in commit_msg:
                 return commit_msg
-    
+
     # Strategy 1: Remove thinking tags first
     cleaned = raw_output
 
     thinking_patterns = [
-        r'<think>.*?</think>',
-        r'<thinking>.*?</thinking>',
-        r'<analysis>.*?</analysis>',
-        r'<thought>.*?</thought>',
+        r"<think>.*?</think>",
+        r"<thinking>.*?</thinking>",
+        r"<analysis>.*?</analysis>",
+        r"<thought>.*?</thought>",
     ]
-    
+
     for pattern in thinking_patterns:
-        cleaned = re.sub(pattern, '', cleaned, flags=re.DOTALL | re.IGNORECASE)
-    
+        cleaned = re.sub(pattern, "", cleaned, flags=re.DOTALL | re.IGNORECASE)
+
     # Strategy 2: Extract multi-line commit message (for detailed commits)
-    lines = cleaned.split('\n')
+    lines = cleaned.split("\n")
     commit_start_idx = -1
-    
+
     # Find where the actual commit message starts
     for i, line in enumerate(lines):
         line = line.strip()
         if not line:
             continue
-            
+
         # Skip obvious analysis/thinking lines
         skip_patterns = [
-            r'^(okay|let me|looking at|based on|i can see|this appears|it seems|the changes|analyzing|from the diff|the diff shows|that fits|the conventional|putting it all together)',
-            r'^(maybe|probably|also|since|but|however|therefore|thus|hence|so)',
-            r'characters?\.|spec\.|good\.|needed\.|similar\.',
-            r'(should be|would be|could be|might be)',
+            r"^(okay|let me|looking at|based on|i can see|this appears|it seems|the changes|analyzing|from the diff|the diff shows|that fits|the conventional|putting it all together)",
+            r"^(maybe|probably|also|since|but|however|therefore|thus|hence|so)",
+            r"characters?\.|spec\.|good\.|needed\.|similar\.",
+            r"(should be|would be|could be|might be)",
         ]
-        
+
         is_analysis = False
         for pattern in skip_patterns:
             if re.search(pattern, line, re.IGNORECASE):
                 is_analysis = True
                 break
-        
+
         if not is_analysis:
             # Check if this looks like a commit message start
-            if (re.match(r'^[A-Z][a-z]', line) and len(line) < 72) or \
-               re.match(r'^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\([^)]+\))?:', line, re.IGNORECASE):
+            if (re.match(r"^[A-Z][a-z]", line) and len(line) < 72) or re.match(
+                r"^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\([^)]+\))?:",
+                line,
+                re.IGNORECASE,
+            ):
                 commit_start_idx = i
                 break
-    
+
     # Strategy 3: Extract the commit message from start index
     if commit_start_idx >= 0:
         commit_lines = []
         for i in range(commit_start_idx, len(lines)):
             line = lines[i].strip()
-            
+
             # Stop at obvious analysis continuation
-            if re.search(r'^(the feature|this|it|also note|avoid the|focus on|make sure)', line, re.IGNORECASE):
+            if re.search(
+                r"^(the feature|this|it|also note|avoid the|focus on|make sure)",
+                line,
+                re.IGNORECASE,
+            ):
                 break
-                
+
             # Include the line if it's substantial
             if line:
                 commit_lines.append(line)
             elif commit_lines:  # Empty line after we've started collecting
-                commit_lines.append('')
-        
+                commit_lines.append("")
+
         if commit_lines:
             # Clean up trailing empty lines
             while commit_lines and not commit_lines[-1]:
                 commit_lines.pop()
-            
+
             if commit_lines:
-                return '\n'.join(commit_lines)
-    
+                return "\n".join(commit_lines)
+
     # Strategy 4: Look for conventional commit patterns (fallback for simple commits)
-    conventional_pattern = r'^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\([^)]+\))?\s*:\s*.+$'
-    
+    conventional_pattern = r"^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\([^)]+\))?\s*:\s*.+$"
+
     for line in lines:
         line = line.strip()
         if re.match(conventional_pattern, line, re.IGNORECASE):
             return line
-    
+
     # Strategy 5: Find the most commit-like single line
     potential_commits = []
     for line in lines:
         line = line.strip()
         if not line or len(line) < 10:
             continue
-            
+
         # Skip obvious analysis text
         skip_patterns = [
-            r'^(okay|let me|looking at|based on|i can see|this appears|it seems|the changes|analyzing|from the diff|the diff shows|that fits|the conventional)',
-            r'^(here\'s|here is|the commit message|commit message|message)',
-            r'characters?\.|spec\.|good\.|needed\.',
+            r"^(okay|let me|looking at|based on|i can see|this appears|it seems|the changes|analyzing|from the diff|the diff shows|that fits|the conventional)",
+            r"^(here\'s|here is|the commit message|commit message|message)",
+            r"characters?\.|spec\.|good\.|needed\.",
         ]
-        
+
         skip_line = False
         for pattern in skip_patterns:
             if re.search(pattern, line, re.IGNORECASE):
                 skip_line = True
                 break
-        
+
         if not skip_line:
             # Score the line based on commit-like characteristics
             score = 0
-            if re.match(r'^[A-Z][a-z]', line):  # Starts with capital letter
+            if re.match(r"^[A-Z][a-z]", line):  # Starts with capital letter
                 score += 5
-            if re.match(r'^[a-z]+(\([^)]+\))?:', line):  # Conventional format
+            if re.match(r"^[a-z]+(\([^)]+\))?:", line):  # Conventional format
                 score += 10
             if len(line) < 72:  # Good commit length
                 score += 3
-            if not line.endswith('.'):  # No period at end
+            if not line.endswith("."):  # No period at end
                 score += 2
-            if any(word in line.lower() for word in ['add', 'fix', 'update', 'remove', 'refactor', 'implement', 'create']):
+            if any(
+                word in line.lower()
+                for word in [
+                    "add",
+                    "fix",
+                    "update",
+                    "remove",
+                    "refactor",
+                    "implement",
+                    "create",
+                ]
+            ):
                 score += 3
-                
+
             potential_commits.append((score, line))
-    
+
     if potential_commits:
         # Return the highest scoring commit-like line
         potential_commits.sort(key=lambda x: x[0], reverse=True)
         return potential_commits[0][1]
-    
+
     # Fallback: return first substantial line
     for line in lines:
         line = line.strip()
-        if line and len(line) > 10 and not line.lower().startswith(('okay', 'let me', 'looking', 'based')):
+        if (
+            line
+            and len(line) > 10
+            and not line.lower().startswith(("okay", "let me", "looking", "based"))
+        ):
             return line
-    
+
     return raw_output.strip()
 
 
 def _setup_ai_services(api_key, provider, config):
     """
     Setup AI services with proper error handling. Reuses logic from main CLI.
-    
+
     Returns:
         Tuple of (ai_service, prompt_engine, active_provider)
     """
@@ -714,36 +793,52 @@ def _setup_ai_services(api_key, provider, config):
         model=config.get_model(active_provider),
     )
     prompt_engine = PromptEngine(prompts_file=str(config.get_prompts_file()))
-    
+
     return ai_service, prompt_engine, active_provider
 
+
 @cli.command()
-@click.option("--style", "-s", default="commit_conventional", 
-              help="Commit message style")
-@click.option("--stage-all", "-a", is_flag=True, 
-              help="Stage all changes before committing")
-@click.option("--no-commit", is_flag=True, 
-              help="Generate message only, don't commit")
+@click.option(
+    "--style", "-s", default="commit_conventional", help="Commit message style"
+)
+@click.option(
+    "--stage-all", "-a", is_flag=True, help="Stage all changes before committing"
+)
+@click.option("--no-commit", is_flag=True, help="Generate message only, don't commit")
 @click.option("--api-key", help="LLM API key (overrides config)")
-@click.option("--provider", type=click.Choice(AIService.supported_providers()),
+@click.option(
+    "--provider",
+    type=click.Choice(AIService.supported_providers()),
     help="LLM provider to use (openai, groq, claude)",
 )
-@click.option("--max-tokens", type=int, default=None,
-    help="Maximum tokens for diff content (auto-calculated if not set)"
+@click.option(
+    "--max-tokens",
+    type=int,
+    default=None,
+    help="Maximum tokens for diff content (auto-calculated if not set)",
 )
-@click.option("--output-tokens", type=int, default=1500,
-    help="Tokens reserved for AI response (default: 1500)"
+@click.option(
+    "--output-tokens",
+    type=int,
+    default=1500,
+    help="Tokens reserved for AI response (default: 1500)",
 )
 def commit(style, stage_all, no_commit, api_key, provider, max_tokens, output_tokens):
     """Generate AI-powered commit message from current changes and commit."""
     try:
         config = Config()
-        ai_service, prompt_engine, active_provider = _setup_ai_services(api_key, provider, config)
-        
+        ai_service, prompt_engine, active_provider = _setup_ai_services(
+            api_key, provider, config
+        )
+
         git_parser = GitParser()
         changes_summary = git_parser.get_changes_summary()
-        
-        if not changes_summary["has_staged"] and not changes_summary["has_unstaged"] and not changes_summary["has_untracked"]:
+
+        if (
+            not changes_summary["has_staged"]
+            and not changes_summary["has_unstaged"]
+            and not changes_summary["has_untracked"]
+        ):
             console.print("[yellow]No changes to commit.[/yellow]")
             sys.exit(0)
 
@@ -753,14 +848,20 @@ def commit(style, stage_all, no_commit, api_key, provider, max_tokens, output_to
             changes_summary = git_parser.get_changes_summary()
 
         if changes_summary["has_staged"]:
-            console.print(f"\n[bold]Staged files ({len(changes_summary['staged_files'])}):[/bold]")
+            console.print(
+                f"\n[bold]Staged files ({len(changes_summary['staged_files'])}):[/bold]"
+            )
             for file in changes_summary["staged_files"][:10]:
                 console.print(f"  [green]✓[/green] {file}")
             if len(changes_summary["staged_files"]) > 10:
-                console.print(f"  ... and {len(changes_summary['staged_files']) - 10} more")
+                console.print(
+                    f"  ... and {len(changes_summary['staged_files']) - 10} more"
+                )
         else:
             console.print("\n[bold red]No staged changes to commit.[/bold red]")
-            console.print("Use [cyan]--stage-all[/cyan] to stage all changes, or stage files manually with [cyan]git add[/cyan]")
+            console.print(
+                "Use [cyan]--stage-all[/cyan] to stage all changes, or stage files manually with [cyan]git add[/cyan]"
+            )
             sys.exit(1)
 
         diff_text = git_parser.get_all_changes_diff()
@@ -769,15 +870,15 @@ def commit(style, stage_all, no_commit, api_key, provider, max_tokens, output_to
             sys.exit(1)
 
         token_counter = TokenCounter(provider=active_provider)
-        
+
         try:
             if max_tokens is None:
                 max_tokens = token_counter.calculate_max_diff_tokens(
                     model=ai_service.model_name,
                     prompt_style=style,
-                    output_reserve=output_tokens
+                    output_reserve=output_tokens,
                 )
-                
+
                 console.print(
                     f"[dim]Token allocation - Diff: {max_tokens:,} | "
                     f"Output: {output_tokens:,}[/dim]"
@@ -785,12 +886,11 @@ def commit(style, stage_all, no_commit, api_key, provider, max_tokens, output_to
         except ValueError as e:
             console.print(f"[bold red]Error:[/bold red] {e}")
             sys.exit(1)
-        
+
         diff_text, original_tokens, final_tokens = token_counter.truncate_intelligently(
-            diff_text, 
-            max_tokens
+            diff_text, max_tokens
         )
-        
+
         if original_tokens > max_tokens:
             console.print(
                 f"[yellow]⚠ Diff truncated:[/yellow] {original_tokens:,} → {final_tokens:,} tokens"
@@ -809,18 +909,22 @@ def commit(style, stage_all, no_commit, api_key, provider, max_tokens, output_to
             console.print(f"[bold red]Error:[/bold red] {e}")
             sys.exit(1)
 
-        with console.status("[bold green]Generating commit message with AI...", spinner="dots"):
+        with console.status(
+            "[bold green]Generating commit message with AI...", spinner="dots"
+        ):
             try:
                 raw_commit_message = ai_service.generate_post(
                     system_prompt=rendered_prompt["system"],
                     user_prompt=rendered_prompt["user"],
-                    max_tokens=output_tokens, 
+                    max_tokens=output_tokens,
                     temperature=config.get_temperature(),
                 )
             except Exception as e:
-                console.print(f"[bold red]Error generating commit message:[/bold red] {e}")
+                console.print(
+                    f"[bold red]Error generating commit message:[/bold red] {e}"
+                )
                 sys.exit(1)
-        
+
         commit_message = _clean_ai_output(raw_commit_message)
 
         console.print("\n" + "=" * 60)
@@ -834,26 +938,32 @@ def commit(style, stage_all, no_commit, api_key, provider, max_tokens, output_to
         console.print("=" * 60 + "\n")
 
         if no_commit:
-            console.print("[yellow]Message generated. Use without --no-commit to actually commit.[/yellow]")
+            console.print(
+                "[yellow]Message generated. Use without --no-commit to actually commit.[/yellow]"
+            )
             sys.exit(0)
 
         console.print("[bold]Do you want to commit with this message?[/bold]")
         console.print("  [green]y[/green] - Yes, commit now")
         console.print("  [yellow]e[/yellow] - Edit message")
         console.print("  [red]n[/red] - Cancel")
-        
-        choice = click.prompt("\nChoice", type=click.Choice(['y', 'e', 'n']), default='y')
 
-        if choice == 'n':
+        choice = click.prompt(
+            "\nChoice", type=click.Choice(["y", "e", "n"]), default="y"
+        )
+
+        if choice == "n":
             console.print("[yellow]Commit cancelled.[/yellow]")
             sys.exit(0)
-        
-        if choice == 'e':
+
+        if choice == "e":
             edited_message = click.edit(commit_message)
             if edited_message:
                 commit_message = edited_message.strip()
             else:
-                console.print("[yellow]Commit cancelled (no message provided).[/yellow]")
+                console.print(
+                    "[yellow]Commit cancelled (no message provided).[/yellow]"
+                )
                 sys.exit(0)
 
         try:
